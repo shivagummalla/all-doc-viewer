@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>All Doc Viewer</title>
+<meta name="theme-color" content="#14211a" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+<style>
+  :root{
+    --md-bg: #0f1610;
+    --md-surface: #141b15;
+    --md-surface-2: #1b231c;
+    --md-surface-3: #232c23;
+    --md-on-surface: #e5e7e1;
+    --md-on-surface-var: #a3aa9f;
+    --md-primary: #8BD5A0;
+    --md-on-primary: #0B3818;
+    --md-primary-container: #1E4B29;
+    --md-outline: #333b32;
+    --md-error: #ffb4ab;
+    --md-error-container: #4b1f22;
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 10px;
+
+    --c-pdf: #ff8a80;
+    --c-sheet: #7fdc9d;
+    --c-doc: #90caf9;
+    --c-image: #d4a3f0;
+    --c-text: #ffcc80;
+    --c-other: #b0b6ad;
+  }
+
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0; font-family: "Roboto","Segoe UI",system-ui,-apple-system,sans-serif;
+    background: var(--md-bg); color: var(--md-on-surface); overflow:hidden;
+  }
+  .app{ height:100vh; display:flex; flex-direction:column; }
+
+  /* Top bar (viewer only) */
+  .topbar{
+    height: 60px; display:flex; align-items:center; gap:8px; padding: 0 8px;
+    background: var(--md-surface); border-bottom: 1px solid var(--md-outline); flex-shrink:0;
+  }
+  .topbar .title{ font-size:16px; font-weight:500; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .icon-btn{
+    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:transparent; border:none; color: var(--md-on-surface); cursor:pointer; transition: background .15s ease; flex-shrink:0;
+  }
+  .icon-btn:hover{ background: var(--md-surface-3); }
+  .icon-btn svg{ width:22px; height:22px; fill: currentColor; }
+  .icon-btn.filled{ background: var(--md-primary-container); color: var(--md-primary); }
+
+  .content{ flex:1; overflow-y:auto; padding-bottom: 8px; }
+  .page{ display:none; padding: 20px 20px 12px; }
+  .page.active{ display:block; }
+
+  .page-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
+  .page-head .eyebrow{ font-size:13px; color: var(--md-on-surface-var); margin:0 0 2px; }
+  .page-head h1{ font-size:28px; font-weight:600; margin:0; }
+  .page-head .sub{ font-size:13px; color: var(--md-on-surface-var); margin-top:2px; }
+  .head-actions{ display:flex; gap:6px; align-items:center; }
+
+  .fab-add{
+    width:44px; height:44px; border-radius:14px; border:none; cursor:pointer;
+    background: var(--md-primary-container); color: var(--md-primary);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .fab-add svg{ width:22px; height:22px; fill: currentColor; }
+
+  .searchbar{
+    display:flex; align-items:center; gap:10px; background: var(--md-surface-2);
+    border-radius: 28px; padding: 12px 18px; margin-bottom: 20px; color: var(--md-on-surface-var);
+  }
+  .searchbar svg{ width:18px; height:18px; fill: currentColor; flex-shrink:0; }
+  .searchbar input{
+    background:none; border:none; outline:none; color: var(--md-on-surface); font-size:14px; width:100%;
+  }
+  .searchbar input::placeholder{ color: var(--md-on-surface-var); }
+
+  .import-btn{
+    height:40px; padding:0 18px; border-radius:20px; border:none; background: var(--md-primary);
+    color: var(--md-on-primary); font-weight:600; font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;
+  }
+  .import-btn svg{ width:16px; height:16px; fill:currentColor; }
+
+  .chips-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px; }
+  .chip{
+    flex-shrink:0; padding:8px 16px; border-radius:10px; background: var(--md-surface-2); color: var(--md-on-surface-var);
+    font-size:13px; cursor:pointer; border:1px solid transparent; white-space:nowrap;
+  }
+  .chip.active{ background: var(--md-primary-container); color: var(--md-primary); font-weight:600; }
+
+  .sort-row{ display:flex; gap:18px; margin-bottom:16px; border-bottom:1px solid var(--md-outline); }
+  .sort-item{ font-size:13px; color: var(--md-on-surface-var); padding-bottom:8px; cursor:pointer; border-bottom:2px solid transparent; }
+  .sort-item.active{ color: var(--md-primary); border-color: var(--md-primary); font-weight:600; }
+
+  .empty-state{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    gap:14px; padding: 60px 20px;
+  }
+  .empty-state .glyph{
+    width:80px; height:80px; border-radius:50%; background: var(--md-surface-2);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .empty-state .glyph svg{ width:34px; height:34px; fill: var(--md-on-surface-var); }
+  .empty-state h3{ margin:0; font-size:17px; font-weight:600; }
+  .empty-state p{ margin:0; font-size:13px; color: var(--md-on-surface-var); max-width:280px; }
+
+  .file-list{ display:flex; flex-direction:column; gap:8px; }
+  .file-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap:12px; }
+
+  .file-card{
+    position:relative; background: var(--md-surface-2); border-radius: var(--radius-md); cursor:pointer;
+    transition: background .15s ease;
+  }
+  .file-card:hover{ background: var(--md-surface-3); }
+  .file-card.list{ display:flex; align-items:center; gap:14px; padding:12px 14px; }
+  .file-card.grid{ display:flex; flex-direction:column; gap:10px; padding:16px 14px; align-items:flex-start; }
+
+  .ftype-icon{
+    width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; flex-shrink:0;
+  }
+  .file-card.grid .ftype-icon{ width:48px; height:48px; border-radius:12px; }
+
+  .fmeta{ min-width:0; flex:1; }
+  .fname{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fsub{ font-size:11.5px; color: var(--md-on-surface-var); margin-top:2px; }
+
+  .file-del{
+    position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%;
+    background: rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;
+    opacity:0; transition: opacity .15s ease;
+  }
+  .file-card:hover .file-del{ opacity:1; }
+  .file-del svg{ width:14px; height:14px; fill: #fff; }
+
+  /* Settings */
+  .card{ background: var(--md-surface-2); border-radius: var(--radius-md); margin-bottom:20px; overflow:hidden; }
+  .card-label{ font-size:11px; letter-spacing:0.08em; color: var(--md-on-surface-var); padding: 14px 16px 6px; font-weight:600; }
+  .row{ display:flex; align-items:center; gap:14px; padding:12px 16px; cursor:default; }
+  .row.clickable{ cursor:pointer; }
+  .row.clickable:hover{ background: var(--md-surface-3); }
+  .row + .row{ border-top:1px solid var(--md-outline); }
+  .row-icon{
+    width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .row-icon svg{ width:19px; height:19px; }
+  .row-text{ flex:1; min-width:0; }
+  .row-title{ font-size:14px; }
+  .row-sub{ font-size:12px; color: var(--md-on-surface-var); margin-top:1px; }
+  .row-title.danger{ color: var(--md-error); }
+  .chevron{ width:18px; height:18px; fill: var(--md-on-surface-var); flex-shrink:0; }
+
+  .theme-row{ display:flex; gap:16px; padding: 8px 18px 20px; flex-wrap:wrap; }
+  .swatch{
+    width:36px; height:36px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    border:2px solid transparent; box-sizing:content-box; flex-shrink:0; position:relative;
+  }
+  .swatch.selected{ border-color: var(--md-on-surface); }
+  .swatch svg{ width:16px; height:16px; fill:#fff; opacity:0; }
+  .swatch.selected svg{ opacity:1; }
+
+  /* Bottom nav */
+  .bottomnav{
+    display:flex; background: var(--md-surface); border-top:1px solid var(--md-outline);
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom)); flex-shrink:0;
+  }
+  .nav-item{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer;
+    color: var(--md-on-surface-var); background:none; border:none; padding:2px 0;
+  }
+  .nav-icon-pill{
+    display:flex; align-items:center; justify-content:center; padding:4px 20px; border-radius:16px;
+    background: transparent; transition: background .15s ease;
+  }
+  .nav-item svg{ width:22px; height:22px; fill: currentColor; }
+  .nav-item span{ font-size:11px; }
+  .nav-item.active{ color: var(--md-primary); }
+  .nav-item.active .nav-icon-pill{ background: var(--md-primary-container); }
+
+  /* Viewer */
+  #viewerPage{ position:absolute; inset:0; background: var(--md-bg); display:none; flex-direction:column; z-index:20; }
+  #viewerPage.active{ display:flex; }
+  .viewer-content{ flex:1; overflow:auto; }
+  .viewer-pad{ padding:16px; }
+  #pdfContainer{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  #pdfContainer canvas{ box-shadow:0 2px 10px rgba(0,0,0,.5); border-radius:4px; max-width:100%; }
+  .docx-wrap{ max-width:820px; margin:0 auto; background:#fff; color:#111; padding:40px; border-radius: var(--radius-md); line-height:1.5; }
+  table.sheet{ border-collapse:collapse; font-size:13px; width:max-content; }
+  table.sheet th, table.sheet td{ border:1px solid var(--md-outline); padding:6px 10px; white-space:nowrap; }
+  table.sheet th{ background: var(--md-surface-3); position:sticky; top:0; }
+  .sheet-tabs{ display:flex; gap:6px; padding: 8px 16px 0; overflow-x:auto; }
+  .sheet-tab{ padding:6px 14px; border-radius:8px 8px 0 0; font-size:12px; background: var(--md-surface-2); cursor:pointer; white-space:nowrap; }
+  .sheet-tab.active{ background: var(--md-surface-3); color: var(--md-primary); font-weight:600; }
+  .text-view{ max-width:820px; margin:0 auto; white-space:pre-wrap; word-wrap:break-word; font-family:"Roboto Mono",monospace; font-size:13px; line-height:1.6; background: var(--md-surface-2); padding:20px; border-radius: var(--radius-md); }
+  .img-view{ height:100%; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .img-view img{ max-width:100%; max-height:100%; border-radius: var(--radius-sm); }
+  .meta-view{ max-width:480px; margin: 40px auto; background: var(--md-surface-2); border-radius: var(--radius-md); padding:28px; text-align:center; }
+  .meta-view .ficon{ width:64px; height:64px; border-radius:16px; margin:0 auto 16px; display:flex; align-items:center; justify-content:center; }
+  .meta-view h3{ margin:0 0 4px; font-size:16px; word-break:break-all; }
+  .meta-view p{ margin:2px 0; font-size:13px; color: var(--md-on-surface-var); }
+  .center-msg{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color: var(--md-on-surface-var); font-size:14px; padding:24px; text-align:center; }
+  .progress{ width:220px; height:4px; border-radius:2px; background: var(--md-surface-3); overflow:hidden; }
+  .progress > div{ height:100%; width:30%; background: var(--md-primary); animation: indet 1.1s infinite ease-in-out; }
+  @keyframes indet{ 0%{ transform: translateX(-100%); } 100%{ transform: translateX(400%); } }
+
+  ::-webkit-scrollbar{ width:8px; height:8px; }
+  ::-webkit-scrollbar-thumb{ background: var(--md-outline); border-radius:4px; }
+
+  #fileInput{ display:none; }
+
+  .snackbar{
+    position:fixed; left:50%; bottom:88px; transform:translateX(-50%); background:#333; color:#fff;
+    padding:12px 20px; border-radius:8px; font-size:13px; box-shadow:0 2px 8px rgba(0,0,0,.5);
+    opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:50; white-space:nowrap;
+  }
+  .snackbar.show{ opacity:1; }
+
+  .modal-overlay{
+    position:fixed; inset:0; background: rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:60; padding:20px;
+  }
+  .modal-overlay.show{ display:flex; }
+  .modal{ background: var(--md-surface-2); border-radius: var(--radius-md); padding:24px; max-width:340px; width:100%; }
+  .modal h3{ margin:0 0 8px; font-size:17px; }
+  .modal p{ margin:0 0 20px; font-size:13.5px; color: var(--md-on-surface-var); }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; }
+  .modal-btn{ height:38px; padding:0 16px; border-radius:20px; border:none; cursor:pointer; font-size:13px; font-weight:600; }
+  .modal-btn.cancel{ background:none; color: var(--md-on-surface-var); }
+  .modal-btn.danger{ background: var(--md-error-container); color: var(--md-error); }
+</style>
+</head>
+<body>
+
+<div class="app" id="appRoot">
+
+  <!-- HOME -->
+  <div class="content" id="mainContent">
+    <div class="page active" id="homePage">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">All Doc Viewer</p>
+          <h1 id="homeCount">0 files</h1>
+        </div>
+        <button class="fab-add" id="addBtnHome" title="Import files">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+        </button>
+      </div>
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5L20.5 19l-5-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+        <input type="text" id="homeSearch" placeholder="Search files..." />
+      </div>
+      <div id="homeListWrap"></div>
+    </div>
+
+    <!-- BROWSE -->
+    <div class="page" id="browsePage">
+      <div class="page-head">
+        <div>
+          <h1 style="font-size:24px;">Browse</h1>
+          <p class="sub" id="browseSub">0 files · 0 B</p>
+        </div>
+        <div class="head-actions">
+          <button class="icon-btn" id="viewToggleBtn" title="Toggle view"></button>
+          <button class="import-btn" id="addBtnBrowse">
+            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+            Import
+          </button>
+        </div>
+      </div>
+      <div class="chips-row" id="chipsRow"></div>
+      <div class="sort-row" id="sortRow"></div>
+      <div id="browseListWrap"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="page" id="settingsPage">
+      <div class="page-head"><h1 style="font-size:24px;">Settings</h1></div>
+
+      <div class="card-label">APPEARANCE</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-icon" style="background: var(--md-surface-3); color: var(--md-on-surface);">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20zm0 2v16a8 8 0 0 1 0-16z"/></svg>
+          </div>
+          <div class="row-text">
+            <div class="row-title">Color theme</div>
+            <div class="row-sub">Choose an accent color</div>
+          </div>
+        </div>
+        <div class="theme-row" id="themeRow"></div>
+      </div>
+
+      <div class="card-label">STORAGE</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-icon" style="background: var(--md-primary-container); color: var(--md-primary);">
+            <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+          </div>
+          <div class="row-text">
+            <div class="row-title">Files imported</div>
+            <div class="row-sub" id="storageSub">0 files · 0 B</div>
+          </div>
+        </div>
+        <div class="row clickable" id="clearAllRow">
+          <div class="row-icon" style="background: var(--md-error-container); color: var(--md-error);">
+            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+          </div>
+          <div class="row-text">
+            <div class="row-title danger">Clear all files</div>
+            <div class="row-sub">Remove all imported files from this device</div>
+          </div>
+          <svg class="chevron" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+        </div>
+      </div>
+
+      <div class="card-label">SUPPORTED FORMATS</div>
+      <div class="card" id="formatsCard"></div>
+
+      <div class="card-label">ABOUT</div>
+      <div class="card">
+        <div class="row">
+          <div class="row-icon" style="background: var(--md-primary-container); color: var(--md-primary);">
+            <svg viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
+          </div>
+          <div class="row-text">
+            <div class="row-title">All Doc Viewer</div>
+            <div class="row-sub">Version 1.0.0 · View files offline</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEWER -->
+    <div id="viewerPage">
+      <div class="topbar">
+        <button class="icon-btn" id="backBtn">
+          <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+        </button>
+        <div class="title" id="viewerTitle">File</div>
+      </div>
+      <div class="viewer-content" id="viewerContent"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottomnav" id="bottomNav">
+    <button class="nav-item active" data-page="home">
+      <span class="nav-icon-pill"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" data-page="browse">
+      <span class="nav-icon-pill"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></span>
+      <span>Browse</span>
+    </button>
+    <button class="nav-item" data-page="settings">
+      <span class="nav-icon-pill"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.61l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84c-.24 0-.44.17-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.74 8.87a.5.5 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.5.5 0 0 0-.12.61l1.92 3.32c.12.22.39.3.6.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.06.25.26.42.5.42h3.84c.24 0 .44-.17.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.49 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></span>
+      <span>Settings</span>
+    </button>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json,.xml,.html,.css,.js,image/*" multiple />
+<div class="snackbar" id="snackbar"></div>
+
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear all files?</h3>
+    <p>This removes every imported file from this device. This can't be undone.</p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" id="clearCancel">Cancel</button>
+      <button class="modal-btn danger" id="clearConfirm">Clear all</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/pdf.min.js"></script>
+<script src="assets/mammoth.browser.min.js"></script>
+<script src="assets/xlsx.min.js"></script>
+<script>
+(function(){
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "assets/pdf.worker.min.js";
+
+  /* ---------------- IndexedDB ---------------- */
+  const DB_NAME = "all-doc-viewer-db", DB_VERSION = 1;
+  function openDb(){
+    return new Promise((resolve,reject)=>{
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = ()=>{
+        const db = req.result;
+        if (!db.objectStoreNames.contains("files")) db.createObjectStore("files", { keyPath:"id" });
+        if (!db.objectStoreNames.contains("incoming")) db.createObjectStore("incoming", { keyPath:"id" });
+      };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+  async function dbAll(store){
+    const db = await openDb();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(store,"readonly");
+      const req = tx.objectStore(store).getAll();
+      req.onsuccess = ()=> resolve(req.result || []);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+  async function dbGet(store,id){
+    const db = await openDb();
+    return new Promise((resolve,reject)=>{
+      const req = db.transaction(store,"readonly").objectStore(store).get(id);
+      req.onsuccess = ()=> resolve(req.result || null);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+  async function dbPut(store,obj){
+    const db = await openDb();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(store,"readwrite");
+      tx.objectStore(store).put(obj);
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+  async function dbDelete(store,id){
+    const db = await openDb();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(store,"readwrite");
+      tx.objectStore(store).delete(id);
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+  async function dbClear(store){
+    const db = await openDb();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(store,"readwrite");
+      tx.objectStore(store).clear();
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+
+  /* ---------------- Helpers ---------------- */
+  function ext(name){ return (name.split(".").pop() || "").toLowerCase(); }
+  function fmtSize(b){
+    if (b < 1024) return b + " B";
+    if (b < 1024*1024) return (b/1024).toFixed(1) + " KB";
+    return (b/1024/1024).toFixed(1) + " MB";
+  }
+  function category(name){
+    const e = ext(name);
+    if (e === "pdf") return "pdf";
+    if (["xlsx","xls","csv"].includes(e)) return "sheet";
+    if (e === "docx") return "doc";
+    if (["jpg","jpeg","png","gif","webp","svg"].includes(e)) return "image";
+    if (["txt","md","json","xml","html","css","js","log"].includes(e)) return "text";
+    return "other";
+  }
+  const CAT_META = {
+    pdf:   { label:"PDF",    color:"var(--c-pdf)",   bg:"rgba(255,138,128,.16)" },
+    sheet: { label:"Sheet",  color:"var(--c-sheet)", bg:"rgba(127,220,157,.16)" },
+    doc:   { label:"Doc",    color:"var(--c-doc)",   bg:"rgba(144,202,249,.16)" },
+    image: { label:"Image",  color:"var(--c-image)", bg:"rgba(212,163,240,.16)" },
+    text:  { label:"Text",   color:"var(--c-text)",  bg:"rgba(255,204,128,.16)" },
+    other: { label:"File",   color:"var(--c-other)", bg:"rgba(176,182,173,.16)" }
+  };
+  function typeIcon(cat){
+    const m = CAT_META[cat];
+    return `<div class="ftype-icon" style="background:${m.bg}; color:${m.color};">${m.label.slice(0,3).toUpperCase()}</div>`;
+  }
+  function showSnack(msg){
+    const s = document.getElementById("snackbar");
+    s.textContent = msg; s.classList.add("show");
+    setTimeout(()=> s.classList.remove("show"), 2200);
+  }
+
+  /* ---------------- Theme ---------------- */
+  const THEMES = [
+    { key:"green",  primary:"#8BD5A0", onPrimary:"#0B3818", container:"#1E4B29" },
+    { key:"blue",   primary:"#A5C8FF", onPrimary:"#00315C", container:"#1F3D68" },
+    { key:"purple", primary:"#D9BBFC", onPrimary:"#3A1364", container:"#4B2A73" },
+    { key:"orange", primary:"#FFB68C", onPrimary:"#5A2100", container:"#6C3113" }
+  ];
+  function applyTheme(key){
+    const t = THEMES.find(x=>x.key===key) || THEMES[0];
+    const r = document.documentElement.style;
+    r.setProperty("--md-primary", t.primary);
+    r.setProperty("--md-on-primary", t.onPrimary);
+    r.setProperty("--md-primary-container", t.container);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", t.container);
+    localStorage.setItem("themeColor", t.key);
+    renderThemeRow();
+  }
+  function renderThemeRow(){
+    const current = localStorage.getItem("themeColor") || "green";
+    const row = document.getElementById("themeRow");
+    row.innerHTML = THEMES.map(t=>`
+      <div class="swatch ${t.key===current?'selected':''}" data-theme="${t.key}" style="background:${t.primary};">
+        <svg viewBox="0 0 24 24"><path d="M9 16.2l-3.5-3.5L4 14.2 9 19.2l11-11-1.4-1.4z"/></svg>
+      </div>`).join("");
+    row.querySelectorAll(".swatch").forEach(el=>{
+      el.addEventListener("click", ()=> applyTheme(el.dataset.theme));
+    });
+  }
+
+  /* ---------------- State ---------------- */
+  let filesCache = [];
+  let browseFilter = "all";
+  let browseSort = "recent";
+  let browseView = localStorage.getItem("browseView") || "grid";
+  let homeSearchTerm = "";
+  let cameFrom = "home";
+
+  async function refreshFiles(){
+    filesCache = await dbAll("files");
+    filesCache.sort((a,b)=> b.addedAt - a.addedAt);
+    renderHome();
+    renderBrowse();
+    renderSettingsStorage();
+  }
+
+  /* ---------------- Home ---------------- */
+  function renderHome(){
+    document.getElementById("homeCount").textContent = filesCache.length + (filesCache.length===1 ? " file" : " files");
+    const wrap = document.getElementById("homeListWrap");
+    let list = filesCache;
+    if (homeSearchTerm) list = list.filter(f=> f.name.toLowerCase().includes(homeSearchTerm));
+
+    if (list.length === 0){
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <div class="glyph"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+          <h3>${homeSearchTerm ? "No matches" : "No files yet"}</h3>
+          <p>${homeSearchTerm ? "Try a different search term." : "Tap the + button to import PDFs, spreadsheets, documents, images, and more."}</p>
+        </div>`;
+      return;
+    }
+    wrap.innerHTML = `<div class="file-list">${list.slice(0,20).map(f=> fileCardHtml(f,"list")).join("")}</div>`;
+    wireFileCards(wrap, "home");
+  }
+
+  /* ---------------- Browse ---------------- */
+  const CHIPS = [
+    {key:"all", label:"All"}, {key:"pdf", label:"PDF"}, {key:"sheet", label:"Sheets"},
+    {key:"doc", label:"Docs"}, {key:"image", label:"Images"}, {key:"text", label:"Text"}, {key:"other", label:"Other"}
+  ];
+  const SORTS = [ {key:"recent", label:"Recent"}, {key:"name", label:"Name"}, {key:"size", label:"Size"}, {key:"type", label:"Type"} ];
+
+  function renderChipsAndSort(){
+    document.getElementById("chipsRow").innerHTML = CHIPS.map(c=>
+      `<div class="chip ${browseFilter===c.key?'active':''}" data-chip="${c.key}">${c.label}</div>`).join("");
+    document.getElementById("chipsRow").querySelectorAll(".chip").forEach(el=>{
+      el.addEventListener("click", ()=>{ browseFilter = el.dataset.chip; renderBrowse(); });
+    });
+    document.getElementById("sortRow").innerHTML = SORTS.map(s=>
+      `<div class="sort-item ${browseSort===s.key?'active':''}" data-sort="${s.key}">${s.label}</div>`).join("");
+    document.getElementById("sortRow").querySelectorAll(".sort-item").forEach(el=>{
+      el.addEventListener("click", ()=>{ browseSort = el.dataset.sort; renderBrowse(); });
+    });
+  }
+
+  function updateViewToggleIcon(){
+    const btn = document.getElementById("viewToggleBtn");
+    btn.innerHTML = browseView === "grid"
+      ? `<svg viewBox="0 0 24 24"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h16v2H4z"/></svg>`
+      : `<svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/></svg>`;
+  }
+
+  function renderBrowse(){
+    const totalSize = filesCache.reduce((s,f)=> s+f.size, 0);
+    document.getElementById("browseSub").textContent = `${filesCache.length} files · ${fmtSize(totalSize)}`;
+
+    let list = filesCache.filter(f=> browseFilter==="all" || category(f.name)===browseFilter);
+    if (browseSort==="name") list = [...list].sort((a,b)=> a.name.localeCompare(b.name));
+    else if (browseSort==="size") list = [...list].sort((a,b)=> b.size-a.size);
+    else if (browseSort==="type") list = [...list].sort((a,b)=> category(a.name).localeCompare(category(b.name)) || a.name.localeCompare(b.name));
+    else list = [...list].sort((a,b)=> b.addedAt-a.addedAt);
+
+    const wrap = document.getElementById("browseListWrap");
+    if (list.length === 0){
+      wrap.innerHTML = `
+        <div class="empty-state">
+          <div class="glyph"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+          <h3>No files imported</h3>
+          <p>Import files to view them offline.</p>
+        </div>`;
+      return;
+    }
+    if (browseView === "grid"){
+      wrap.innerHTML = `<div class="file-grid">${list.map(f=> fileCardHtml(f,"grid")).join("")}</div>`;
+    } else {
+      wrap.innerHTML = `<div class="file-list">${list.map(f=> fileCardHtml(f,"list")).join("")}</div>`;
+    }
+    wireFileCards(wrap, "browse");
+  }
+
+  function fileCardHtml(f, mode){
+    const cat = category(f.name);
+    const dateStr = new Date(f.addedAt).toLocaleDateString();
+    return `
+      <div class="file-card ${mode}" data-id="${f.id}">
+        ${typeIcon(cat)}
+        <div class="fmeta">
+          <div class="fname">${f.name}</div>
+          <div class="fsub">${fmtSize(f.size)} · ${dateStr}</div>
+        </div>
+        <button class="file-del" data-del="${f.id}" title="Remove">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>`;
+  }
+
+  function wireFileCards(container, fromPage){
+    container.querySelectorAll(".file-card").forEach(card=>{
+      card.addEventListener("click", (e)=>{
+        if (e.target.closest("[data-del]")) return;
+        cameFrom = fromPage;
+        openFileById(card.dataset.id);
+      });
+    });
+    container.querySelectorAll("[data-del]").forEach(btn=>{
+      btn.addEventListener("click", async (e)=>{
+        e.stopPropagation();
+        await dbDelete("files", btn.dataset.del);
+        showSnack("File removed");
+        refreshFiles();
+      });
+    });
+  }
+
+  /* ---------------- Settings ---------------- */
+  function renderSettingsStorage(){
+    const totalSize = filesCache.reduce((s,f)=> s+f.size, 0);
+    const txt = `${filesCache.length} files · ${fmtSize(totalSize)}`;
+    document.getElementById("storageSub").textContent = txt;
+  }
+
+  const FORMATS = [
+    { cat:"pdf",   title:"PDF Documents", sub:".pdf" },
+    { cat:"sheet", title:"Spreadsheets",  sub:".xlsx, .xls, .csv" },
+    { cat:"doc",   title:"Word Documents", sub:".docx" },
+    { cat:"image", title:"Images", sub:".jpg, .png, .gif, .webp, .svg" },
+    { cat:"text",  title:"Text & Code", sub:".txt, .md, .json, .xml, .html" },
+    { cat:"other", title:"Other files", sub:"Any format (metadata view)" }
+  ];
+  function renderFormatsCard(){
+    const el = document.getElementById("formatsCard");
+    el.innerHTML = FORMATS.map(f=>{
+      const m = CAT_META[f.cat];
+      return `<div class="row">
+        <div class="row-icon" style="background:${m.bg}; color:${m.color};">${typeIconSvg(f.cat)}</div>
+        <div class="row-text"><div class="row-title">${f.title}</div><div class="row-sub">${f.sub}</div></div>
+      </div>`;
+    }).join("");
+  }
+  function typeIconSvg(cat){
+    const paths = {
+      pdf: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>',
+      sheet: '<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18"/>',
+      doc: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>',
+      image: '<path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5z"/>',
+      text: '<path d="M4 4h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/>',
+      other: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/>'
+    };
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">${paths[cat]||paths.other}</svg>`;
+  }
+
+  /* ---------------- Import ---------------- */
+  const fileInput = document.getElementById("fileInput");
+  document.getElementById("addBtnHome").addEventListener("click", ()=> fileInput.click());
+  document.getElementById("addBtnBrowse").addEventListener("click", ()=> fileInput.click());
+
+  fileInput.addEventListener("change", async (e)=>{
+    const files = [...e.target.files];
+    if (!files.length) return;
+    for (const f of files){
+      await dbPut("files", {
+        id: Date.now() + "-" + Math.random().toString(36).slice(2),
+        name: f.name, size: f.size, type: f.type, blob: f, addedAt: Date.now()
+      });
+    }
+    showSnack(`Imported ${files.length} file${files.length>1?"s":""}`);
+    fileInput.value = "";
+    refreshFiles();
+  });
+
+  /* ---------------- Clear all ---------------- */
+  const clearModal = document.getElementById("clearModal");
+  document.getElementById("clearAllRow").addEventListener("click", ()=> clearModal.classList.add("show"));
+  document.getElementById("clearCancel").addEventListener("click", ()=> clearModal.classList.remove("show"));
+  document.getElementById("clearConfirm").addEventListener("click", async ()=>{
+    await dbClear("files");
+    clearModal.classList.remove("show");
+    showSnack("All files cleared");
+    refreshFiles();
+  });
+
+  /* ---------------- Nav ---------------- */
+  const pages = { home: document.getElementById("homePage"), browse: document.getElementById("browsePage"), settings: document.getElementById("settingsPage") };
+  document.querySelectorAll(".nav-item").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".nav-item").forEach(b=> b.classList.remove("active"));
+      btn.classList.add("active");
+      Object.values(pages).forEach(p=> p.classList.remove("active"));
+      pages[btn.dataset.page].classList.add("active");
+    });
+  });
+
+  document.getElementById("homeSearch").addEventListener("input", (e)=>{
+    homeSearchTerm = e.target.value.trim().toLowerCase();
+    renderHome();
+  });
+
+  document.getElementById("viewToggleBtn").addEventListener("click", ()=>{
+    browseView = browseView === "grid" ? "list" : "grid";
+    localStorage.setItem("browseView", browseView);
+    updateViewToggleIcon();
+    renderBrowse();
+  });
+
+  /* ---------------- Viewer ---------------- */
+  const viewerPage = document.getElementById("viewerPage");
+  const viewerContent = document.getElementById("viewerContent");
+  const viewerTitle = document.getElementById("viewerTitle");
+  const bottomNav = document.getElementById("bottomNav");
+
+  document.getElementById("backBtn").addEventListener("click", ()=>{
+    viewerPage.classList.remove("active");
+    bottomNav.style.display = "flex";
+  });
+
+  async function openFileById(id){
+    const meta = await dbGet("files", id);
+    if (!meta) return;
+    await openViewer(meta.blob, meta.name);
+  }
+
+  async function openViewer(blob, name){
+    viewerTitle.textContent = name;
+    viewerPage.classList.add("active");
+    bottomNav.style.display = "none";
+    const cat = category(name);
+    try{
+      if (cat === "pdf") await openPdf(blob);
+      else if (cat === "doc") await openDocx(blob);
+      else if (cat === "sheet") await openSheet(blob, ext(name));
+      else if (cat === "text") await openText(blob);
+      else if (cat === "image") await openImage(blob);
+      else await openMeta(blob, name);
+    } catch(err){
+      console.error(err);
+      viewerContent.innerHTML = `<div class="center-msg">Couldn't open this file. It may be corrupted or an unsupported variant.</div>`;
+    }
+  }
+
+  function loadingMsg(msg){
+    viewerContent.innerHTML = `<div class="center-msg"><div class="progress"><div></div></div><div>${msg}</div></div>`;
+  }
+
+  async function openPdf(blob){
+    loadingMsg("Opening PDF…");
+    const buf = await blob.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    viewerContent.innerHTML = `<div id="pdfContainer"></div>`;
+    const container = document.getElementById("pdfContainer");
+    for (let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.4 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+      container.appendChild(canvas);
+    }
+  }
+
+  async function openDocx(blob){
+    loadingMsg("Opening document…");
+    const buf = await blob.arrayBuffer();
+    const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+    viewerContent.innerHTML = `<div class="viewer-pad"><div class="docx-wrap">${result.value}</div></div>`;
+  }
+
+  async function openSheet(blob, kind){
+    loadingMsg("Opening spreadsheet…");
+    let wb;
+    if (kind === "csv"){
+      const text = await blob.text();
+      wb = XLSX.read(text, { type: "string" });
+    } else {
+      const buf = await blob.arrayBuffer();
+      wb = XLSX.read(buf, { type: "array" });
+    }
+    const names = wb.SheetNames;
+    viewerContent.innerHTML = `<div class="sheet-tabs" id="sheetTabs"></div><div class="viewer-pad" id="sheetContent"></div>`;
+    const tabsEl = document.getElementById("sheetTabs");
+    const contentEl = document.getElementById("sheetContent");
+    function renderSheet(idx){
+      const ws = wb.Sheets[names[idx]];
+      contentEl.innerHTML = XLSX.utils.sheet_to_html(ws, { id:"sheetTable" });
+      const t = document.getElementById("sheetTable");
+      if (t) t.classList.add("sheet");
+      [...tabsEl.children].forEach((el,i)=> el.classList.toggle("active", i===idx));
+    }
+    names.forEach((n,i)=>{
+      const tab = document.createElement("div");
+      tab.className = "sheet-tab" + (i===0?" active":"");
+      tab.textContent = n;
+      tab.addEventListener("click", ()=> renderSheet(i));
+      tabsEl.appendChild(tab);
+    });
+    renderSheet(0);
+  }
+
+  async function openText(blob){
+    loadingMsg("Opening file…");
+    const text = await blob.text();
+    const esc = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    viewerContent.innerHTML = `<div class="viewer-pad"><div class="text-view">${esc}</div></div>`;
+  }
+
+  async function openImage(blob){
+    const url = URL.createObjectURL(blob);
+    viewerContent.innerHTML = `<div class="img-view"><img src="${url}" /></div>`;
+  }
+
+  async function openMeta(blob, name){
+    viewerContent.innerHTML = `
+      <div class="meta-view">
+        <div class="ficon" style="background:${CAT_META.other.bg}; color:${CAT_META.other.color};">${typeIconSvg("other")}</div>
+        <h3>${name}</h3>
+        <p>${fmtSize(blob.size)}</p>
+        <p>${blob.type || "Unknown type"}</p>
+        <p style="margin-top:14px; font-size:12px;">Preview isn't available for this format yet.</p>
+      </div>`;
+  }
+
+  /* ---------------- Share-target incoming ---------------- */
+  async function checkIncomingShare(){
+    if (!location.search.includes("shared=1")) return;
+    history.replaceState(null, "", location.pathname);
+    const incoming = await dbGet("incoming", "pending");
+    if (!incoming) return;
+    const id = Date.now() + "-shared";
+    await dbPut("files", { id, name: incoming.name, size: incoming.size, type: incoming.type, blob: incoming.blob, addedAt: Date.now() });
+    await dbDelete("incoming", "pending");
+    await refreshFiles();
+    showSnack("Opened from share");
+    cameFrom = "home";
+    openViewer(incoming.blob, incoming.name);
+  }
+
+  /* ---------------- Init ---------------- */
+  applyTheme(localStorage.getItem("themeColor") || "green");
+  renderChipsAndSort();
+  renderFormatsCard();
+  updateViewToggleIcon();
+  refreshFiles().then(checkIncomingShare);
+
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", ()=> navigator.serviceWorker.register("sw.js").catch(()=>{}));
+  }
+})();
+</script>
+</body>
+</html>
